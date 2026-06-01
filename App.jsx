@@ -189,15 +189,18 @@ export default function App() {
   const addDirective = async ({ content, urgency }) => {
     if (!content.trim()) return;
     const row = { content: content.trim(), urgency, done: false, created_at: new Date().toISOString() };
-    const { data } = await supabase.from("directives").insert(row).select().single();
+    const { data, error } = await supabase.from("directives").insert(row).select().single();
+    if (error) { console.error("지시사항 저장 실패", error); setError("지시사항 저장에 실패했습니다: " + error.message); return; }
     if (data) setDirectives((p) => [data, ...p]);
   };
   const toggleDirective = async (id, done) => {
-    await supabase.from("directives").update({ done }).eq("id", id);
+    const { error } = await supabase.from("directives").update({ done }).eq("id", id);
+    if (error) { console.error("지시사항 업데이트 실패", error); return; }
     setDirectives((p) => p.map((d) => d.id === id ? { ...d, done } : d));
   };
   const removeDirective = async (id) => {
-    await supabase.from("directives").delete().eq("id", id);
+    const { error } = await supabase.from("directives").delete().eq("id", id);
+    if (error) { console.error("지시사항 삭제 실패", error); return; }
     setDirectives((p) => p.filter((d) => d.id !== id));
   };
 
