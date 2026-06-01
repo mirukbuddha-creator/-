@@ -5,7 +5,7 @@ import {
   Loader2, PauseCircle, LogIn, ExternalLink, Repeat, MessageSquare,
 } from "lucide-react";
 import { supabase } from "./supabase";
-import { loadGoogle, requestToken, fetchEvents } from "./googleCalendar";
+import { loadGoogle, requestToken, fetchEvents, fetchUserEmail } from "./googleCalendar";
 import { CALENDARS, MONTHS_AHEAD } from "./config";
 
 const FONT_LINK =
@@ -80,6 +80,7 @@ export default function App() {
   const [memberModal, setMemberModal] = useState(false);
   const [syncedAt, setSyncedAt] = useState(null);
   const [directives, setDirectives] = useState([]);
+  const [userEmail, setUserEmail] = useState(null);
 
   // ---- 로드 ----
   const loadAll = useCallback(async () => {
@@ -113,6 +114,8 @@ export default function App() {
       await loadGoogle();
       await requestToken({ prompt: "" });
       setAuthed(true);
+      const email = await fetchUserEmail();
+      setUserEmail(email);
       await loadAll();
     } catch (e) {
       console.error(e);
@@ -186,9 +189,9 @@ export default function App() {
   };
 
   // ---- 팀장 지시사항 ----
-  const addDirective = async ({ content, urgency }) => {
+  const addDirective = async ({ content, urgency, due_date }) => {
     if (!content.trim()) return;
-    const row = { content: content.trim(), urgency, done: false, created_at: new Date().toISOString() };
+    const row = { content: content.trim(), urgency, done: false, created_at: new Date().toISOString(), created_by: userEmail, due_date: due_date || null };
     const { data, error } = await supabase.from("directives").insert(row).select().single();
     if (error) { console.error("지시사항 저장 실패", error); setError("지시사항 저장에 실패했습니다: " + error.message); return; }
     if (data) setDirectives((p) => [data, ...p]);
@@ -286,7 +289,7 @@ export default function App() {
       )}
 
       <main style={{ marginTop: 18 }}>
-        {view === "dashboard" && <Dashboard tasks={tasks} members={members} memberById={memberById} onOpen={setTaskModal} directives={directives} onAddDirective={addDirective} onToggleDirective={toggleDirective} onRemoveDirective={removeDirective} />}
+        {view === "dashboard" && <Dashboard tasks={tasks} members={members} memberById={memberById} onOpen={setTaskModal} directives={directives} onAddDirective={addDirective} onToggleDirective={toggleDirective} onRemoveDirective={removeDirective} userEmail={userEmail} />}
         {view === "calendar" && <CalendarView tasks={filtered} cursor={cursor} setCursor={setCursor} memberById={memberById} onOpen={setTaskModal} />}
         {view === "list" && <ListView tasks={filtered} memberById={memberById} onOpen={setTaskModal} onCycle={cycleStatus} />}
       </main>
@@ -307,7 +310,7 @@ export default function App() {
 }
 
 // ---------- 대시보드 ----------
-function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirective, onToggleDirective, onRemoveDirective }) {
+function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirective, onToggleDirective, onRemoveDirective, userEmail }) {
   const [showDone, setShowDone] = useState(false);
   const today = todayISO();
   const counts = STATUS_ORDER.map((s) => ({ key: s, ...STATUS[s], n: tasks.filter((t) => t.status === s).length }));
@@ -317,7 +320,7 @@ function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirect
 
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
-      <DirectivesPanel directives={directives} onAdd={onAddDirective} onToggle={onToggleDirective} onRemove={onRemoveDirective} />
+      <DirectivesPanel directives={directives} onAdd={onAddDirective} onToggle={onToggleDirective} onRemove={onRemoveDirective} userEmail={userEmail} />
       <div style={statGrid}>
         {counts.map((c) => {
           const Icon = c.icon; const clickable = c.key === "done";
@@ -545,31 +548,32 @@ function MemberModal({ members, onAdd, onRemove, onClose }) {
   );
 }
 
-// ---------- 팀장 지시사항 패널 ----------
+// ---------- 기타업무사항 패널 ----------
 const URGENCY = {
   urgent: { label: "긴급", color: "#b3402f", bg: "#f6e0dc" },
   normal: { label: "일반", color: "#8a8478", bg: "#ece8df" },
 };
 
-function DirectivesPanel({ directives, onAdd, onToggle, onRemove }) {
+function DirectivesPanel({ directives, onAdd, onToggle, onRemove, userEmail }) {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState("");
   const [urgency, setUrgency] = useState("normal");
+  const [dueDate, setDueDate] = useState("");
   const active = directives.filter((d) => !d.done);
   const done = directives.filter((d) => d.done);
 
   const submit = () => {
     if (!content.trim()) return;
-    onAdd({ content, urgency });
-    setContent(""); setUrgency("normal"); setOpen(false);
+    onAdd({ content, urgency, due_date: dueDate });
+    setContent(""); setUrgency("normal"); setDueDate(""); setOpen(false);
   };
 
   return (
     <div style={{ marginBottom: 22, background: "#fbfaf6", border: "1px solid #ece8df", borderTop: "3px solid #2a241b", borderRadius: 12, padding: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: active.length > 0 || done.length > 0 ? 14 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: active.length > 0 || done.length > 0 || open ? 14 : 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <MessageSquare size={16} style={{ color: "#2a241b" }} />
-          <span style={{ fontWeight: 600, color: "#2a241b", fontSize: 15 }}>팀장 지시사항</span>
+          <span style={{ fontWeight: 600, color: "#2a241b", fontSize: 15 }}>기타업무사항</span>
           {active.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "#b3402f", borderRadius: 99, padding: "1px 7px" }}>{active.length}</span>}
         </div>
         <button className="sch-btn" style={{ ...ghostBtn, padding: "6px 12px", fontSize: 12 }} onClick={() => setOpen((v) => !v)}>
@@ -579,30 +583,34 @@ function DirectivesPanel({ directives, onAdd, onToggle, onRemove }) {
 
       {open && (
         <div style={{ marginBottom: 14, padding: 14, background: "#f5f3ee", borderRadius: 10, border: "1px solid #ece8df", display: "flex", flexDirection: "column", gap: 10, animation: "fadeUp .2s ease" }}>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} placeholder="지시사항 내용을 입력하세요" style={{ ...input, resize: "vertical", fontFamily: "inherit" }} />
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} placeholder="업무 내용을 입력하세요" style={{ ...input, resize: "vertical", fontFamily: "inherit" }} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <select value={urgency} onChange={(e) => setUrgency(e.target.value)} style={{ ...input, width: "auto", padding: "6px 10px", fontSize: 13 }}>
               <option value="normal">일반</option>
               <option value="urgent">긴급</option>
             </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: "#8a8478", whiteSpace: "nowrap" }}>기한</span>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} style={{ ...input, width: "auto", padding: "6px 10px", fontSize: 13 }} />
+            </div>
             <button className="sch-btn" style={{ ...primaryBtn, padding: "7px 16px", fontSize: 13 }} onClick={submit}>등록</button>
           </div>
         </div>
       )}
 
-      {active.length === 0 && done.length === 0 && !open && <div style={{ color: "#bdb6a6", fontSize: 13, textAlign: "center", padding: "12px 0" }}>등록된 지시사항이 없습니다.</div>}
+      {active.length === 0 && done.length === 0 && !open && <div style={{ color: "#bdb6a6", fontSize: 13, textAlign: "center", padding: "12px 0" }}>등록된 업무사항이 없습니다.</div>}
 
       {active.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {active.map((d) => <DirectiveRow key={d.id} d={d} onToggle={onToggle} onRemove={onRemove} />)}
+          {active.map((d) => <DirectiveRow key={d.id} d={d} onToggle={onToggle} onRemove={onRemove} userEmail={userEmail} />)}
         </div>
       )}
 
       {done.length > 0 && (
         <details style={{ marginTop: active.length > 0 ? 12 : 0 }}>
-          <summary style={{ fontSize: 12, color: "#a8a292", cursor: "pointer", userSelect: "none" }}>완료된 지시사항 {done.length}건</summary>
+          <summary style={{ fontSize: 12, color: "#a8a292", cursor: "pointer", userSelect: "none" }}>완료된 항목 {done.length}건</summary>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-            {done.map((d) => <DirectiveRow key={d.id} d={d} onToggle={onToggle} onRemove={onRemove} />)}
+            {done.map((d) => <DirectiveRow key={d.id} d={d} onToggle={onToggle} onRemove={onRemove} userEmail={userEmail} />)}
           </div>
         </details>
       )}
@@ -610,24 +618,37 @@ function DirectivesPanel({ directives, onAdd, onToggle, onRemove }) {
   );
 }
 
-function DirectiveRow({ d, onToggle, onRemove }) {
+function DirectiveRow({ d, onToggle, onRemove, userEmail }) {
   const urg = URGENCY[d.urgency] || URGENCY.normal;
-  const dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "";
+  const today = todayISO();
+  const canDelete = userEmail && d.created_by === userEmail;
+  let dueLabel = null;
+  let dueColor = "#a8a292";
+  if (d.due_date) {
+    const diff = daysBetween(today, d.due_date);
+    if (diff < 0) { dueLabel = `${Math.abs(diff)}일 지남`; dueColor = "#b3402f"; }
+    else if (diff === 0) { dueLabel = "오늘 마감"; dueColor = "#b3402f"; }
+    else if (diff <= 3) { dueLabel = `D-${diff}`; dueColor = "#b06a1e"; }
+    else { dueLabel = `D-${diff}`; dueColor = "#8a8478"; }
+  }
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: d.done ? "#f5f3ee" : "#fff", borderRadius: 9, border: "1px solid #ece8df", opacity: d.done ? 0.6 : 1 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: d.done ? "#f5f3ee" : "#fff", borderRadius: 9, border: "1px solid #ece8df", opacity: d.done ? 0.65 : 1 }}>
       <button className="sch-btn" style={{ ...iconBtn, marginTop: 1, flexShrink: 0 }} onClick={() => onToggle(d.id, !d.done)} title={d.done ? "미완료로 변경" : "완료 처리"}>
         {d.done ? <CheckCircle2 size={18} style={{ color: "#3f6f53" }} /> : <Circle size={18} style={{ color: "#c4bdae" }} />}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontSize: 14, color: "#2a241b", textDecoration: d.done ? "line-through" : "none", lineHeight: 1.5 }}>{d.content}</span>
-        <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 5, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: urg.color, background: urg.bg, padding: "1px 7px", borderRadius: 99 }}>{urg.label}</span>
-          {dateStr && <span style={{ fontSize: 11, color: "#bdb6a6" }}>{dateStr}</span>}
+          {dueLabel && <span style={{ fontSize: 11, fontWeight: 600, color: dueColor }}>· {d.due_date} ({dueLabel})</span>}
+          {!d.due_date && d.created_at && <span style={{ fontSize: 11, color: "#bdb6a6" }}>· {new Date(d.created_at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })} 등록</span>}
         </div>
       </div>
-      <button className="sch-btn" style={{ ...iconBtn, flexShrink: 0 }} onClick={() => onRemove(d.id)} title="삭제">
-        <Trash2 size={14} style={{ color: "#c4bdae" }} />
-      </button>
+      {canDelete && (
+        <button className="sch-btn" style={{ ...iconBtn, flexShrink: 0 }} onClick={() => onRemove(d.id)} title="삭제">
+          <Trash2 size={14} style={{ color: "#c4bdae" }} />
+        </button>
+      )}
     </div>
   );
 }

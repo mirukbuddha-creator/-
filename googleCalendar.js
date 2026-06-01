@@ -48,6 +48,15 @@ export function getToken() {
   return accessToken;
 }
 
+export async function fetchUserEmail() {
+  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.email || null;
+}
+
 // 특정 캘린더의 이벤트 조회 (반복 일정은 singleEvents로 펼침)
 export async function fetchEvents(calendarId, timeMin, timeMax) {
   const all = [];
