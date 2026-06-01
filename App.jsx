@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Calendar, List, LayoutDashboard, Users, RefreshCw, Plus, X, Trash2,
   ChevronLeft, ChevronRight, Clock, AlertTriangle, CheckCircle2, Circle,
-  Loader2, PauseCircle, LogIn, ExternalLink, Repeat,
+  Loader2, PauseCircle, LogIn, ExternalLink, Repeat, MessageSquare,
 } from "lucide-react";
 import { supabase } from "./supabase";
 import { loadGoogle, requestToken, fetchEvents } from "./googleCalendar";
@@ -79,6 +79,7 @@ export default function App() {
   const [taskModal, setTaskModal] = useState(null);
   const [memberModal, setMemberModal] = useState(false);
   const [syncedAt, setSyncedAt] = useState(null);
+  const [directives, setDirectives] = useState([]);
 
   // ---- 로드 ----
   const loadAll = useCallback(async () => {
@@ -100,6 +101,9 @@ export default function App() {
 
     const { data: memRows } = await supabase.from("members").select("*").order("created_at");
     setMembers(memRows || []);
+
+    const { data: dirRows } = await supabase.from("directives").select("*").order("created_at", { ascending: false });
+    setDirectives(dirRows || []);
     setSyncedAt(Date.now());
   }, []);
 
@@ -179,6 +183,22 @@ export default function App() {
   const cycleStatus = (task) => {
     const i = STATUS_ORDER.indexOf(task.status);
     saveMeta(task, { status: STATUS_ORDER[(i + 1) % STATUS_ORDER.length] });
+  };
+
+  // ---- 팀장 지시사항 ----
+  const addDirective = async ({ content, urgency }) => {
+    if (!content.trim()) return;
+    const row = { content: content.trim(), urgency, done: false, created_at: new Date().toISOString() };
+    const { data } = await supabase.from("directives").insert(row).select().single();
+    if (data) setDirectives((p) => [data, ...p]);
+  };
+  const toggleDirective = async (id, done) => {
+    await supabase.from("directives").update({ done }).eq("id", id);
+    setDirectives((p) => p.map((d) => d.id === id ? { ...d, done } : d));
+  };
+  const removeDirective = async (id) => {
+    await supabase.from("directives").delete().eq("id", id);
+    setDirectives((p) => p.filter((d) => d.id !== id));
   };
 
   // ---- 팀원 ----
@@ -263,7 +283,7 @@ export default function App() {
       )}
 
       <main style={{ marginTop: 18 }}>
-        {view === "dashboard" && <Dashboard tasks={tasks} members={members} memberById={memberById} onOpen={setTaskModal} />}
+        {view === "dashboard" && <Dashboard tasks={tasks} members={members} memberById={memberById} onOpen={setTaskModal} directives={directives} onAddDirective={addDirective} onToggleDirective={toggleDirective} onRemoveDirective={removeDirective} />}
         {view === "calendar" && <CalendarView tasks={filtered} cursor={cursor} setCursor={setCursor} memberById={memberById} onOpen={setTaskModal} />}
         {view === "list" && <ListView tasks={filtered} memberById={memberById} onOpen={setTaskModal} onCycle={cycleStatus} />}
       </main>
@@ -284,7 +304,7 @@ export default function App() {
 }
 
 // ---------- 대시보드 ----------
-function Dashboard({ tasks, members, memberById, onOpen }) {
+function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirective, onToggleDirective, onRemoveDirective }) {
   const [showDone, setShowDone] = useState(false);
   const today = todayISO();
   const counts = STATUS_ORDER.map((s) => ({ key: s, ...STATUS[s], n: tasks.filter((t) => t.status === s).length }));
@@ -294,6 +314,7 @@ function Dashboard({ tasks, members, memberById, onOpen }) {
 
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
+      <DirectivesPanel directives={directives} onAdd={onAddDirective} onToggle={onToggleDirective} onRemove={onRemoveDirective} />
       <div style={statGrid}>
         {counts.map((c) => {
           const Icon = c.icon; const clickable = c.key === "done";
@@ -518,6 +539,93 @@ function MemberModal({ members, onAdd, onRemove, onClose }) {
         </div>
       </div>
     </Overlay>
+  );
+}
+
+// ---------- 팀장 지시사항 패널 ----------
+const URGENCY = {
+  urgent: { label: "긴급", color: "#b3402f", bg: "#f6e0dc" },
+  normal: { label: "일반", color: "#8a8478", bg: "#ece8df" },
+};
+
+function DirectivesPanel({ directives, onAdd, onToggle, onRemove }) {
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState("");
+  const [urgency, setUrgency] = useState("normal");
+  const active = directives.filter((d) => !d.done);
+  const done = directives.filter((d) => d.done);
+
+  const submit = () => {
+    if (!content.trim()) return;
+    onAdd({ content, urgency });
+    setContent(""); setUrgency("normal"); setOpen(false);
+  };
+
+  return (
+    <div style={{ marginBottom: 22, background: "#fbfaf6", border: "1px solid #ece8df", borderTop: "3px solid #2a241b", borderRadius: 12, padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: active.length > 0 || done.length > 0 ? 14 : 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <MessageSquare size={16} style={{ color: "#2a241b" }} />
+          <span style={{ fontWeight: 600, color: "#2a241b", fontSize: 15 }}>팀장 지시사항</span>
+          {active.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "#b3402f", borderRadius: 99, padding: "1px 7px" }}>{active.length}</span>}
+        </div>
+        <button className="sch-btn" style={{ ...ghostBtn, padding: "6px 12px", fontSize: 12 }} onClick={() => setOpen((v) => !v)}>
+          <Plus size={13} /> {open ? "취소" : "추가"}
+        </button>
+      </div>
+
+      {open && (
+        <div style={{ marginBottom: 14, padding: 14, background: "#f5f3ee", borderRadius: 10, border: "1px solid #ece8df", display: "flex", flexDirection: "column", gap: 10, animation: "fadeUp .2s ease" }}>
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} placeholder="지시사항 내용을 입력하세요" style={{ ...input, resize: "vertical", fontFamily: "inherit" }} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select value={urgency} onChange={(e) => setUrgency(e.target.value)} style={{ ...input, width: "auto", padding: "6px 10px", fontSize: 13 }}>
+              <option value="normal">일반</option>
+              <option value="urgent">긴급</option>
+            </select>
+            <button className="sch-btn" style={{ ...primaryBtn, padding: "7px 16px", fontSize: 13 }} onClick={submit}>등록</button>
+          </div>
+        </div>
+      )}
+
+      {active.length === 0 && done.length === 0 && !open && <div style={{ color: "#bdb6a6", fontSize: 13, textAlign: "center", padding: "12px 0" }}>등록된 지시사항이 없습니다.</div>}
+
+      {active.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {active.map((d) => <DirectiveRow key={d.id} d={d} onToggle={onToggle} onRemove={onRemove} />)}
+        </div>
+      )}
+
+      {done.length > 0 && (
+        <details style={{ marginTop: active.length > 0 ? 12 : 0 }}>
+          <summary style={{ fontSize: 12, color: "#a8a292", cursor: "pointer", userSelect: "none" }}>완료된 지시사항 {done.length}건</summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+            {done.map((d) => <DirectiveRow key={d.id} d={d} onToggle={onToggle} onRemove={onRemove} />)}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function DirectiveRow({ d, onToggle, onRemove }) {
+  const urg = URGENCY[d.urgency] || URGENCY.normal;
+  const dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "";
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: d.done ? "#f5f3ee" : "#fff", borderRadius: 9, border: "1px solid #ece8df", opacity: d.done ? 0.6 : 1 }}>
+      <button className="sch-btn" style={{ ...iconBtn, marginTop: 1, flexShrink: 0 }} onClick={() => onToggle(d.id, !d.done)} title={d.done ? "미완료로 변경" : "완료 처리"}>
+        {d.done ? <CheckCircle2 size={18} style={{ color: "#3f6f53" }} /> : <Circle size={18} style={{ color: "#c4bdae" }} />}
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 14, color: "#2a241b", textDecoration: d.done ? "line-through" : "none", lineHeight: 1.5 }}>{d.content}</span>
+        <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: urg.color, background: urg.bg, padding: "1px 7px", borderRadius: 99 }}>{urg.label}</span>
+          {dateStr && <span style={{ fontSize: 11, color: "#bdb6a6" }}>{dateStr}</span>}
+        </div>
+      </div>
+      <button className="sch-btn" style={{ ...iconBtn, flexShrink: 0 }} onClick={() => onRemove(d.id)} title="삭제">
+        <Trash2 size={14} style={{ color: "#c4bdae" }} />
+      </button>
+    </div>
   );
 }
 
