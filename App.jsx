@@ -8,8 +8,7 @@ import { supabase } from "./supabase";
 import { loadGoogle, requestToken, fetchEvents, fetchUserEmail } from "./googleCalendar";
 import { CALENDARS, MONTHS_AHEAD } from "./config";
 
-const FONT_LINK =
-  "@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap');";
+const FONT_LINK = "";
 
 const STATUS = {
   todo:  { label: "대기",   color: "#9a9488", bg: "#ece8df", icon: Circle },
@@ -332,7 +331,7 @@ function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirect
                 <span style={{ fontSize: 13, color: "#8a8478", fontWeight: 500 }}>{c.label}</span>
                 <Icon size={16} style={{ color: c.color }} />
               </div>
-              <div style={{ fontFamily: "'Fraunces',serif", fontSize: 38, fontWeight: 600, color: "#2a241b", lineHeight: 1 }}>{c.n}</div>
+              <div style={{ fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", fontSize: 38, fontWeight: 600, color: "#2a241b", lineHeight: 1 }}>{c.n}</div>
               {clickable && <span style={{ fontSize: 11, color: "#3f6f53", fontWeight: 600 }}>{showDone ? "접기 ▲" : "완료 보기 ▼"}</span>}
             </div>
           );
@@ -395,7 +394,7 @@ function CalendarView({ tasks, cursor, setCursor, memberById, onOpen }) {
     <div style={{ animation: "fadeUp .3s ease" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 18, marginBottom: 14 }}>
         <button className="sch-btn" style={navBtn} onClick={() => setCursor(new Date(y, m - 1, 1))}><ChevronLeft size={18} /></button>
-        <h2 style={{ fontFamily: "'Fraunces',serif", fontSize: 24, fontWeight: 600, color: "#2a241b", margin: 0, minWidth: 150, textAlign: "center" }}>{fmtMonth(cursor)}</h2>
+        <h2 style={{ fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", fontSize: 24, fontWeight: 600, color: "#2a241b", margin: 0, minWidth: 150, textAlign: "center" }}>{fmtMonth(cursor)}</h2>
         <button className="sch-btn" style={navBtn} onClick={() => setCursor(new Date(y, m + 1, 1))}><ChevronRight size={18} /></button>
         <button className="sch-btn" style={{ ...ghostBtn, padding: "6px 12px", fontSize: 12 }} onClick={() => setCursor(new Date())}>오늘</button>
       </div>
@@ -476,7 +475,7 @@ function TaskModal({ task, members, onSave, onClose }) {
     <Overlay onClose={onClose}>
       <div style={modal} onClick={(e) => e.stopPropagation()}>
         <div style={modalHead}>
-          <h3 style={{ fontFamily: "'Fraunces',serif", fontSize: 19, margin: 0, color: "#2a241b", paddingRight: 10 }}>{task.title}</h3>
+          <h3 style={{ fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", fontSize: 19, margin: 0, color: "#2a241b", paddingRight: 10 }}>{task.title}</h3>
           <button className="sch-btn" style={iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <div style={{ fontSize: 12.5, color: "#a8a292", marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -506,7 +505,7 @@ function TaskModal({ task, members, onSave, onClose }) {
           </select>
         </Field>
         <Field label="메모">
-          <textarea value={f.memo} onChange={(e) => set("memo", e.target.value)} rows={3} placeholder="체크포인트, 참고사항 등" style={{ ...input, resize: "vertical", fontFamily: "inherit" }} />
+          <textarea value={f.memo} onChange={(e) => set("memo", e.target.value)} rows={3} placeholder="체크포인트, 참고사항 등" style={{ ...input, resize: "vertical", fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif" }} />
         </Field>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
@@ -526,7 +525,7 @@ function MemberModal({ members, onAdd, onRemove, onClose }) {
     <Overlay onClose={onClose}>
       <div style={{ ...modal, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div style={modalHead}>
-          <h3 style={{ fontFamily: "'Fraunces',serif", fontSize: 20, margin: 0, color: "#2a241b" }}>팀원 관리</h3>
+          <h3 style={{ fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", fontSize: 20, margin: 0, color: "#2a241b" }}>팀원 관리</h3>
           <button className="sch-btn" style={iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
@@ -583,7 +582,7 @@ function DirectivesPanel({ directives, onAdd, onToggle, onRemove, userEmail }) {
 
       {open && (
         <div style={{ marginBottom: 14, padding: 14, background: "#f5f3ee", borderRadius: 10, border: "1px solid #ece8df", display: "flex", flexDirection: "column", gap: 10, animation: "fadeUp .2s ease" }}>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} placeholder="업무 내용을 입력하세요" style={{ ...input, resize: "vertical", fontFamily: "inherit" }} />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={2} placeholder="업무 내용을 입력하세요" style={{ ...input, resize: "vertical", fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif" }} />
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <select value={urgency} onChange={(e) => setUrgency(e.target.value)} style={{ ...input, width: "auto", padding: "6px 10px", fontSize: 13 }}>
               <option value="normal">일반</option>
@@ -701,14 +700,14 @@ const globalCss = `
   .sch-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(40,30,15,.10)}
   .sch-day:hover{background:#efece3 !important}
 `;
-const wrap = { fontFamily: "'IBM Plex Sans KR',sans-serif", background: "#f5f3ee", color: "#2a241b", padding: "24px 26px", maxWidth: 1100, margin: "0 auto", minHeight: "100vh" };
+const wrap = { fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", background: "#f5f3ee", color: "#2a241b", padding: "24px 26px", maxWidth: 1100, margin: "0 auto", minHeight: "100vh" };
 const header = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" };
-const title = { fontFamily: "'Fraunces',serif", fontSize: 30, fontWeight: 600, margin: 0, color: "#2a241b", letterSpacing: "-0.5px" };
+const title = { fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", fontSize: 30, fontWeight: 600, margin: 0, color: "#2a241b", letterSpacing: "-0.5px" };
 const sub = { fontSize: 13, color: "#a8a292", margin: "4px 0 0" };
 const sharedPill = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "#7a4ea8", background: "#efe6f6", padding: "3px 9px", borderRadius: 99 };
 const errorBar = { marginTop: 14, padding: "10px 14px", background: "#f6e0dc", color: "#9e3322", borderRadius: 9, fontSize: 13 };
 const tabs = { display: "flex", gap: 4, marginTop: 20, background: "#ece8df", padding: 4, borderRadius: 10, width: "fit-content" };
-const tab = { display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "none", background: "transparent", borderRadius: 7, fontSize: 13.5, fontWeight: 500, color: "#8a8478", fontFamily: "inherit" };
+const tab = { display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "none", background: "transparent", borderRadius: 7, fontSize: 13.5, fontWeight: 500, color: "#8a8478", fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif" };
 const tabActive = { background: "#fbfaf6", color: "#2a241b", boxShadow: "0 1px 4px rgba(40,30,15,.08)" };
 const filterBar = { display: "flex", gap: 16, marginTop: 16, flexWrap: "wrap", alignItems: "center" };
 const statGrid = { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 };
@@ -717,10 +716,10 @@ const listRow = { display: "flex", alignItems: "center", gap: 12, padding: "12px
 const calGrid = { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 };
 const calHead = { textAlign: "center", fontSize: 12, fontWeight: 600, padding: "6px 0" };
 const calCell = { minHeight: 92, borderRadius: 8, padding: 6, border: "1px solid #ece8df" };
-const primaryBtn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#2a241b", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 500, fontFamily: "inherit" };
-const ghostBtn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", background: "#fbfaf6", color: "#6a6458", border: "1px solid #ddd8cc", borderRadius: 9, fontSize: 14, fontWeight: 500, fontFamily: "inherit" };
+const primaryBtn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "#2a241b", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 500, fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif" };
+const ghostBtn = { display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 14px", background: "#fbfaf6", color: "#6a6458", border: "1px solid #ddd8cc", borderRadius: 9, fontSize: 14, fontWeight: 500, fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif" };
 const navBtn = { display: "grid", placeItems: "center", width: 36, height: 36, background: "#fbfaf6", border: "1px solid #ddd8cc", borderRadius: 9, color: "#6a6458" };
 const iconBtn = { display: "grid", placeItems: "center", width: 32, height: 32, background: "transparent", border: "none", borderRadius: 7 };
 const modal = { background: "#f5f3ee", borderRadius: 16, padding: 24, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(40,30,15,.25)" };
 const modalHead = { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 };
-const input = { width: "100%", padding: "9px 12px", border: "1px solid #ddd8cc", borderRadius: 9, fontSize: 14, fontFamily: "inherit", background: "#fbfaf6", color: "#2a241b", outline: "none" };
+const input = { width: "100%", padding: "9px 12px", border: "1px solid #ddd8cc", borderRadius: 9, fontSize: 14, fontFamily: "'Malgun Gothic','맑은 고딕',sans-serif", background: "#fbfaf6", color: "#2a241b", outline: "none" };
