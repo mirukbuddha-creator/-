@@ -101,6 +101,19 @@ export default function App() {
     (metaRows || []).forEach((r) => { m[r.event_id] = r; });
     setMeta(m);
 
+    // 이벤트 due_date·title 캐시 (알림용)
+    if (all.length > 0) {
+      const cacheRows = all.map((ev) => ({
+        event_id: ev.id,
+        calendar_id: ev.calendarId,
+        due_date: ev.due,
+        title: ev.title,
+        status: m[ev.id]?.status || "todo",
+        updated_at: new Date().toISOString(),
+      }));
+      await supabase.from("event_meta").upsert(cacheRows, { onConflict: "event_id" });
+    }
+
     const { data: memRows } = await supabase.from("members").select("*").order("created_at");
     setMembers(memRows || []);
 
