@@ -49,17 +49,20 @@ async function main() {
   const checkedIds = new Set(todayChecks.filter((c) => c.done).map((c) => c.task_id));
   const undoneDailyTasks = allTasks.filter((t) => !checkedIds.has(t.id));
 
-  // 2. 오늘 마감인 캘린더 업무 중 미완료 (진행중 포함)
+  // 2. 오늘 마감인 캘린더 업무 중 미완료 (status가 null이거나 done이 아닌 것)
   const dueTodayEvents = await supabaseFetch(
     "event_meta",
-    `?due_date=eq.${today}&status=neq.done&title=not.is.null&select=title,status,due_date`
+    `?due_date=eq.${today}&title=not.is.null&or=(status.is.null,status.neq.done)&select=title,status,due_date`
   );
 
   // 3. 지연 중인 업무 (마감일이 오늘 이전이고 미완료)
   const overdueEvents = await supabaseFetch(
     "event_meta",
-    `?due_date=lt.${today}&status=neq.done&title=not.is.null&select=title,status,due_date`
+    `?due_date=lt.${today}&title=not.is.null&or=(status.is.null,status.neq.done)&select=title,status,due_date`
   );
+
+  console.log("오늘 마감 건수:", dueTodayEvents.length, dueTodayEvents);
+  console.log("지연 업무 건수:", overdueEvents.length, overdueEvents);
 
   // 4. 메시지 구성
   let lines = [];
