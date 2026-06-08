@@ -49,19 +49,25 @@ async function main() {
   const checkedIds = new Set(todayChecks.filter((c) => c.done).map((c) => c.task_id));
   const undoneDailyTasks = allTasks.filter((t) => !checkedIds.has(t.id));
 
-  // 2. 오늘 마감인 캘린더 업무 중 미완료
+  // 2. 오늘 마감인 캘린더 업무 중 미완료 (진행중 포함)
   const dueTodayEvents = await supabaseFetch(
     "event_meta",
-    `?due_date=eq.${today}&status=neq.done&select=title,status`
+    `?due_date=eq.${today}&status=neq.done&title=not.is.null&select=title,status,due_date`
   );
 
-  // 3. 메시지 구성
+  // 3. 지연 중인 업무 (마감일이 오늘 이전이고 미완료)
+  const overdueEvents = await supabaseFetch(
+    "event_meta",
+    `?due_date=lt.${today}&status=neq.done&title=not.is.null&select=title,status,due_date`
+  );
+
+  // 4. 메시지 구성
   let lines = [];
   lines.push(`📋 <b>[재무회계팀] 오후 3시 업무 알림</b>`);
   lines.push(`📅 ${today}`);
   lines.push("");
 
-  if (undoneDailyTasks.length === 0 && dueTodayEvents.length === 0) {
+  if (undoneDailyTasks.length === 0 && dueTodayEvents.length === 0 && overdueEvents.length === 0) {
     lines.push("✅ 오늘의 모든 업무가 처리되었습니다. 수고하셨습니다!");
   } else {
     if (undoneDailyTasks.length > 0) {
@@ -72,6 +78,11 @@ async function main() {
     if (dueTodayEvents.length > 0) {
       lines.push(`⚠️ <b>오늘 마감 미완료 일정 (${dueTodayEvents.length}건)</b>`);
       dueTodayEvents.forEach((e) => lines.push(`  • ${e.title}`));
+      lines.push("");
+    }
+    if (overdueEvents.length > 0) {
+      lines.push(`🚨 <b>지연 중인 업무 (${overdueEvents.length}건)</b>`);
+      overdueEvents.forEach((e) => lines.push(`  • ${e.title} (마감: ${e.due_date})`));
       lines.push("");
     }
     lines.push("확인 후 처리해 주세요.");
