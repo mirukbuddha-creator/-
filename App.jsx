@@ -635,14 +635,20 @@ function DailyChecklist({ tasks, checks, onAdd, onRemove, onToggle, userEmail })
         {tasks.map((t) => {
           const done = !!checks[t.id];
           return (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: done ? "#f0f7f2" : "#fff", borderRadius: 9, border: `1px solid ${done ? "#c2dfc9" : "#ece8df"}`, transition: "all .2s" }}>
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: done ? "#f0f7f2" : "#fff8f7", borderRadius: 9, border: `1px solid ${done ? "#c2dfc9" : "#f0c8c2"}`, transition: "all .2s" }}>
               <button className="sch-btn" style={{ ...iconBtn, flexShrink: 0 }} onClick={() => onToggle(t.id, !done)}>
                 {done
                   ? <CheckCircle2 size={20} style={{ color: "#3f6f53" }} />
-                  : <Circle size={20} style={{ color: "#c4bdae" }} />}
+                  : <Circle size={20} style={{ color: "#e08070" }} />}
               </button>
-              <span style={{ flex: 1, fontSize: 14, color: done ? "#6a9e76" : "#2a241b", textDecoration: done ? "line-through" : "none", fontWeight: done ? 400 : 500 }}>{t.title}</span>
-              {done && <span style={{ fontSize: 11, fontWeight: 700, color: "#3f6f53", background: "#dcebe0", padding: "2px 8px", borderRadius: 99 }}>완료</span>}
+              <span style={{ flex: 1, fontSize: 14, color: done ? "#6a9e76" : "#2a241b", textDecoration: done ? "line-through" : "none", fontWeight: 500 }}>{t.title}</span>
+              <span style={{
+                fontSize: 12, fontWeight: 700, padding: "3px 12px", borderRadius: 99, flexShrink: 0,
+                color: done ? "#3f6f53" : "#b3402f",
+                background: done ? "#dcebe0" : "#f6e0dc",
+              }}>
+                {done ? "처리완료" : "미처리"}
+              </span>
               {userEmail && (
                 <button className="sch-btn" style={{ ...iconBtn, flexShrink: 0 }} onClick={() => onRemove(t.id)} title="삭제">
                   <Trash2 size={13} style={{ color: "#d4cfc6" }} />
