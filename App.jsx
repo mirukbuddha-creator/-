@@ -80,6 +80,8 @@ export default function App() {
   const [syncedAt, setSyncedAt] = useState(null);
   const [directives, setDirectives] = useState([]);
   const [userEmail, setUserEmail] = useState(null);
+  const [dailyTasks, setDailyTasks] = useState([]);
+  const [dailyChecks, setDailyChecks] = useState({}); // { task_id: true/false }
 
   // ---- 로드 ----
   const loadAll = useCallback(async () => {
@@ -104,6 +106,16 @@ export default function App() {
 
     const { data: dirRows } = await supabase.from("directives").select("*").order("created_at", { ascending: false });
     setDirectives(dirRows || []);
+
+    const { data: dtRows } = await supabase.from("daily_tasks").select("*").order("order_idx");
+    setDailyTasks(dtRows || []);
+
+    const today = todayISO();
+    const { data: dcRows } = await supabase.from("daily_checks").select("*").eq("check_date", today);
+    const checks = {};
+    (dcRows || []).forEach((r) => { checks[r.task_id] = r.done; });
+    setDailyChecks(checks);
+
     setSyncedAt(Date.now());
   }, []);
 
@@ -185,6 +197,25 @@ export default function App() {
   const cycleStatus = (task) => {
     const i = STATUS_ORDER.indexOf(task.status);
     saveMeta(task, { status: STATUS_ORDER[(i + 1) % STATUS_ORDER.length] });
+  };
+
+  // ---- 필수 업무 체크리스트 ----
+  const addDailyTask = async (title) => {
+    if (!title.trim()) return;
+    const order_idx = dailyTasks.length;
+    const { data, error } = await supabase.from("daily_tasks").insert({ title: title.trim(), order_idx }).select().single();
+    if (error) { console.error("업무 추가 실패", error); return; }
+    if (data) setDailyTasks((p) => [...p, data]);
+  };
+  const removeDailyTask = async (id) => {
+    await supabase.from("daily_tasks").delete().eq("id", id);
+    setDailyTasks((p) => p.filter((t) => t.id !== id));
+    setDailyChecks((p) => { const n = { ...p }; delete n[id]; return n; });
+  };
+  const toggleDailyCheck = async (taskId, done) => {
+    const today = todayISO();
+    await supabase.from("daily_checks").upsert({ task_id: taskId, check_date: today, done }, { onConflict: "task_id,check_date" });
+    setDailyChecks((p) => ({ ...p, [taskId]: done }));
   };
 
   // ---- 팀장 지시사항 ----
@@ -288,7 +319,7 @@ export default function App() {
       )}
 
       <main style={{ marginTop: 18 }}>
-        {view === "dashboard" && <Dashboard tasks={tasks} members={members} memberById={memberById} onOpen={setTaskModal} directives={directives} onAddDirective={addDirective} onToggleDirective={toggleDirective} onRemoveDirective={removeDirective} userEmail={userEmail} />}
+        {view === "dashboard" && <Dashboard tasks={tasks} members={members} memberById={memberById} onOpen={setTaskModal} directives={directives} onAddDirective={addDirective} onToggleDirective={toggleDirective} onRemoveDirective={removeDirective} userEmail={userEmail} dailyTasks={dailyTasks} dailyChecks={dailyChecks} onAddDailyTask={addDailyTask} onRemoveDailyTask={removeDailyTask} onToggleDailyCheck={toggleDailyCheck} />}
         {view === "calendar" && <CalendarView tasks={filtered} cursor={cursor} setCursor={setCursor} memberById={memberById} onOpen={setTaskModal} />}
         {view === "list" && <ListView tasks={filtered} memberById={memberById} onOpen={setTaskModal} onCycle={cycleStatus} />}
       </main>
@@ -309,7 +340,7 @@ export default function App() {
 }
 
 // ---------- 대시보드 ----------
-function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirective, onToggleDirective, onRemoveDirective, userEmail }) {
+function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirective, onToggleDirective, onRemoveDirective, userEmail, dailyTasks, dailyChecks, onAddDailyTask, onRemoveDailyTask, onToggleDailyCheck }) {
   const [showDone, setShowDone] = useState(false);
   const today = todayISO();
   const counts = STATUS_ORDER.map((s) => ({ key: s, ...STATUS[s], n: tasks.filter((t) => t.status === s).length }));
@@ -319,6 +350,7 @@ function Dashboard({ tasks, members, memberById, onOpen, directives, onAddDirect
 
   return (
     <div style={{ animation: "fadeUp .3s ease" }}>
+      <DailyChecklist tasks={dailyTasks} checks={dailyChecks} onAdd={onAddDailyTask} onRemove={onRemoveDailyTask} onToggle={onToggleDailyCheck} userEmail={userEmail} />
       <DirectivesPanel directives={directives} onAdd={onAddDirective} onToggle={onToggleDirective} onRemove={onRemoveDirective} userEmail={userEmail} />
       <div style={statGrid}>
         {counts.map((c) => {
@@ -544,6 +576,89 @@ function MemberModal({ members, onAdd, onRemove, onClose }) {
         </div>
       </div>
     </Overlay>
+  );
+}
+
+// ---------- 필수 업무 체크리스트 ----------
+function DailyChecklist({ tasks, checks, onAdd, onRemove, onToggle, userEmail }) {
+  const [adding, setAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const today = todayISO();
+  const doneCount = tasks.filter((t) => checks[t.id]).length;
+  const total = tasks.length;
+  const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
+
+  const submit = () => {
+    if (!newTitle.trim()) return;
+    onAdd(newTitle);
+    setNewTitle(""); setAdding(false);
+  };
+
+  return (
+    <div style={{ marginBottom: 22, background: "#fbfaf6", border: "1px solid #ece8df", borderTop: "3px solid #3f6f53", borderRadius: 12, padding: 18 }}>
+      {/* 헤더 */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <CheckCircle2 size={16} style={{ color: "#3f6f53" }} />
+          <span style={{ fontWeight: 600, color: "#2a241b", fontSize: 15 }}>오늘의 필수 업무</span>
+          <span style={{ fontSize: 12, color: "#8a8478" }}>{today}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: pct === 100 ? "#3f6f53" : "#8a8478" }}>{doneCount}/{total}</span>
+          {userEmail && (
+            <button className="sch-btn" style={{ ...ghostBtn, padding: "6px 12px", fontSize: 12 }} onClick={() => setAdding((v) => !v)}>
+              <Plus size={13} /> {adding ? "취소" : "업무 추가"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 진행바 */}
+      {total > 0 && (
+        <div style={{ height: 6, background: "#ece8df", borderRadius: 99, marginBottom: 14, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#3f6f53" : "#b06a1e", borderRadius: 99, transition: "width .4s ease" }} />
+        </div>
+      )}
+
+      {/* 추가 폼 */}
+      {adding && (
+        <div style={{ marginBottom: 12, display: "flex", gap: 8, animation: "fadeUp .2s ease" }}>
+          <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="업무 이름 입력" style={{ ...input, flex: 1 }} />
+          <button className="sch-btn" style={{ ...primaryBtn, padding: "7px 16px", fontSize: 13 }} onClick={submit}>추가</button>
+        </div>
+      )}
+
+      {/* 업무 목록 */}
+      {total === 0 && !adding && <div style={{ color: "#bdb6a6", fontSize: 13, textAlign: "center", padding: "14px 0" }}>등록된 필수 업무가 없습니다.</div>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        {tasks.map((t) => {
+          const done = !!checks[t.id];
+          return (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: done ? "#f0f7f2" : "#fff", borderRadius: 9, border: `1px solid ${done ? "#c2dfc9" : "#ece8df"}`, transition: "all .2s" }}>
+              <button className="sch-btn" style={{ ...iconBtn, flexShrink: 0 }} onClick={() => onToggle(t.id, !done)}>
+                {done
+                  ? <CheckCircle2 size={20} style={{ color: "#3f6f53" }} />
+                  : <Circle size={20} style={{ color: "#c4bdae" }} />}
+              </button>
+              <span style={{ flex: 1, fontSize: 14, color: done ? "#6a9e76" : "#2a241b", textDecoration: done ? "line-through" : "none", fontWeight: done ? 400 : 500 }}>{t.title}</span>
+              {done && <span style={{ fontSize: 11, fontWeight: 700, color: "#3f6f53", background: "#dcebe0", padding: "2px 8px", borderRadius: 99 }}>완료</span>}
+              {userEmail && (
+                <button className="sch-btn" style={{ ...iconBtn, flexShrink: 0 }} onClick={() => onRemove(t.id)} title="삭제">
+                  <Trash2 size={13} style={{ color: "#d4cfc6" }} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {pct === 100 && total > 0 && (
+        <div style={{ marginTop: 12, textAlign: "center", fontSize: 13, fontWeight: 600, color: "#3f6f53", animation: "fadeUp .3s ease" }}>
+          🎉 오늘의 필수 업무를 모두 완료했습니다!
+        </div>
+      )}
+    </div>
   );
 }
 
